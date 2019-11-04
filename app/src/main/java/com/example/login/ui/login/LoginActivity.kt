@@ -2,34 +2,37 @@ package com.example.login.ui.login
 
 import android.app.Activity
 import androidx.lifecycle.*
-import android.util.Log
 import android.os.Bundle
 import androidx.annotation.StringRes
 import androidx.appcompat.app.AppCompatActivity
 import android.text.*
-import android.view.View
 import android.view.inputmethod.EditorInfo
 import android.widget.*
 
 import com.example.login.R
+import kotlinx.android.synthetic.main.activity_login.*
+import kotlinx.android.synthetic.main.activity_create.*
 import kotlinx.coroutines.*
+import android.app.AlarmManager
+import android.app.PendingIntent
+import android.content.Context
+import android.view.View
+
 
 class LoginActivity : AppCompatActivity() {
 
     private lateinit var loginViewModel: LoginViewModel
+    private lateinit var createViewModel: CreateViewModel
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
 
         setContentView(R.layout.activity_login)
 
-        val username = findViewById<EditText>(R.id.username)
-        val password = findViewById<EditText>(R.id.password)
-        val login = findViewById<Button>(R.id.login)
-        val loading = findViewById<ProgressBar>(R.id.loading)
-
         loginViewModel = ViewModelProviders.of(this, LoginViewModelFactory())
             .get(LoginViewModel::class.java)
+        createViewModel = ViewModelProviders.of(this, CreateViewModelFactory())
+            .get(CreateViewModel::class.java)
 
         loginViewModel.loginFormState.observe(this@LoginActivity, Observer {
             val loginState = it ?: return@Observer
@@ -37,11 +40,28 @@ class LoginActivity : AppCompatActivity() {
             // disable login button unless both username / password is valid
             login.isEnabled = loginState.isDataValid
 
-            if (loginState.usernameError != null) {
-                username.error = getString(loginState.usernameError)
+            if (loginState.addressError != null) {
+                address.error = getString(loginState.addressError)
             }
             if (loginState.passwordError != null) {
                 password.error = getString(loginState.passwordError)
+            }
+        })
+
+        createViewModel.createFormState.observe(this@LoginActivity, Observer {
+            val createState = it ?: return@Observer
+
+            // disable login button unless both username / password is valid
+            create.isEnabled = createState.isDataValid
+
+            if (createState.addressError != null) {
+                caddress.error = getString(createState.addressError)
+            }
+            if (createState.passwordError != null) {
+                cpassword.error = getString(createState.passwordError)
+            }
+            if (createState.usernameError != null) {
+                cusername.error = getString(createState.usernameError)
             }
         })
 
@@ -61,9 +81,25 @@ class LoginActivity : AppCompatActivity() {
             //finish()
         })
 
-        username.afterTextChanged {
+        createViewModel.createResult.observe(this@LoginActivity, Observer {
+            val createResult = it ?: return@Observer
+
+            cloading.visibility = View.GONE
+            if (createResult.error != null) {
+                showLoginFailed(createResult.error)
+            }
+            if (createResult.success != null) {
+                updateUiWithUser_create(createResult.success)
+            }
+            setResult(Activity.RESULT_OK)
+
+            //Complete and destroy login activity once successful
+            //finish()
+        })
+
+        address.afterTextChanged {
             loginViewModel.loginDataChanged(
-                username.text.toString(),
+                address.text.toString(),
                 password.text.toString()
             )
         }
@@ -71,7 +107,7 @@ class LoginActivity : AppCompatActivity() {
         password.apply {
             afterTextChanged {
                 loginViewModel.loginDataChanged(
-                    username.text.toString(),
+                    address.text.toString(),
                     password.text.toString()
                 )
             }
@@ -80,7 +116,7 @@ class LoginActivity : AppCompatActivity() {
                 when (actionId) {
                     EditorInfo.IME_ACTION_DONE ->
                         GlobalScope.launch(Dispatchers.Main, CoroutineStart.DEFAULT) {
-                            loginViewModel.login(username.text.toString(), password.text.toString())
+                            loginViewModel.login(address.text.toString(), password.text.toString())
                         }
                 }
                 false
@@ -89,7 +125,50 @@ class LoginActivity : AppCompatActivity() {
             login.setOnClickListener {
                 loading.visibility = View.VISIBLE
                 GlobalScope.launch(Dispatchers.Main, CoroutineStart.DEFAULT) {
-                    loginViewModel.login(username.text.toString(), password.text.toString())
+                    loginViewModel.login(address.text.toString(), password.text.toString())
+                }
+            }
+        }
+        swap_button.setOnClickListener {
+            setContentView(R.layout.activity_create)
+            caddress.afterTextChanged {
+                createViewModel.createDataChanged(
+                    caddress.text.toString(),
+                    cpassword.text.toString(),
+                    cusername.text.toString()
+                )
+            }
+            cusername.afterTextChanged {
+                createViewModel.createDataChanged(
+                    caddress.text.toString(),
+                    cpassword.text.toString(),
+                    cusername.text.toString()
+                )
+            }
+            cpassword.apply {
+                afterTextChanged {
+                    createViewModel.createDataChanged(
+                        caddress.text.toString(),
+                        cpassword.text.toString(),
+                        cusername.text.toString()
+                    )
+                }
+
+                setOnEditorActionListener { _, actionId, _ ->
+                    when (actionId) {
+                        EditorInfo.IME_ACTION_DONE ->
+                            GlobalScope.launch(Dispatchers.Main, CoroutineStart.DEFAULT) {
+                                createViewModel.create(caddress.text.toString(), cpassword.text.toString(), cusername.text.toString())
+                            }
+                    }
+                    false
+                }
+
+                create.setOnClickListener {
+                    cloading.visibility = View.VISIBLE
+                    GlobalScope.launch(Dispatchers.Main, CoroutineStart.DEFAULT) {
+                        createViewModel.create(caddress.text.toString(), cpassword.text.toString(), cusername.text.toString())
+                    }
                 }
             }
         }
@@ -104,6 +183,23 @@ class LoginActivity : AppCompatActivity() {
             "$welcome $displayName",
             Toast.LENGTH_LONG
         ).show()
+        finish()
+    }
+
+    private fun updateUiWithUser_create(model: LoggedInUserView) {
+        val create = getString(R.string.create)
+        // TODO : initiate successful logged in experience
+        Toast.makeText(
+            applicationContext,
+            create,
+            Toast.LENGTH_LONG
+        ).show()
+        //再起動
+        val intent = intent
+        val appStarter =
+            PendingIntent.getActivity(applicationContext, 0, intent, PendingIntent.FLAG_ONE_SHOT)
+        val alarmManager = getSystemService(Context.ALARM_SERVICE) as AlarmManager
+        alarmManager.set(AlarmManager.RTC_WAKEUP, System.currentTimeMillis(), appStarter)
         finish()
     }
 

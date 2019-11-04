@@ -1,6 +1,7 @@
 package com.example.login.data
 
 import com.example.login.data.model.LoggedInUser
+import com.example.login.ui.login.Duplicate
 import com.github.kittinunf.fuel.Fuel
 import com.github.kittinunf.fuel.core.FuelManager
 import com.github.kittinunf.fuel.coroutines.awaitStringResponseResult
@@ -35,6 +36,15 @@ class LoginRepository(val dataSource: LoginDataSource) {
     fun login(res: String): Result<LoggedInUser> {
         // handle login
         val result = dataSource.login(res)
+        if (result is Result.Success) {
+            setLoggedInUser(result.data)
+        }
+        return result
+    }
+
+    fun create(duData: Duplicate): Result<LoggedInUser> {
+        // handle login
+        val result = dataSource.create(duData)
         if (result is Result.Success) {
             setLoggedInUser(result.data)
         }

@@ -14,34 +14,38 @@ import com.github.kittinunf.fuel.core.FuelManager
 import com.github.kittinunf.fuel.coroutines.awaitStringResponseResult
 import com.squareup.moshi.*
 import com.squareup.moshi.kotlin.reflect.KotlinJsonAdapterFactory
+import kotlinx.coroutines.CoroutineStart
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.GlobalScope
+import kotlinx.coroutines.launch
 
 data class PostData(
-    var username: String,
+    var address: String,
     var password: String
 )
 
-data class GetData(
+data class Res(
     var res: String
 )
 
-class LoginViewModel(private val loginRepository: LoginRepository) : ViewModel() {
 
+
+class LoginViewModel(private val loginRepository: LoginRepository) : ViewModel() {
     private val _loginForm = MutableLiveData<LoginFormState>()
     val loginFormState: LiveData<LoginFormState> = _loginForm
 
     private val _loginResult = MutableLiveData<LoginResult>()
     val loginResult: LiveData<LoginResult> = _loginResult
 
-    suspend fun login(username: String, password: String) {
-        // can be launched in a separate asynchronous job
+    suspend fun login(address: String, password: String) {
         FuelManager.instance.apply {
             basePath = "http://192.168.43.230:8080"
         }
 
         val postAdapter: JsonAdapter<PostData> = Moshi.Builder().add(KotlinJsonAdapterFactory()).build().adapter(Types.newParameterizedType(PostData::class.java))
-        val getAdapter: JsonAdapter<GetData> = Moshi.Builder().add(KotlinJsonAdapterFactory()).build().adapter(Types.newParameterizedType(GetData::class.java))
+        val getAdapter: JsonAdapter<Res> = Moshi.Builder().add(KotlinJsonAdapterFactory()).build().adapter(Types.newParameterizedType(Res::class.java))
 
-        val data = postAdapter.toJson(PostData(username, password))
+        val data = postAdapter.toJson(PostData(address, password))
         val (_, _, res) = Fuel.post("/login/check").body(data).awaitStringResponseResult()
         val (_res, _) = res
         val __res = getAdapter.fromJson(_res!!)
@@ -55,9 +59,9 @@ class LoginViewModel(private val loginRepository: LoginRepository) : ViewModel()
         }
     }
 
-    fun loginDataChanged(username: String, password: String) {
-        if (!isUserNameValid(username)) {
-            _loginForm.value = LoginFormState(usernameError = R.string.invalid_username)
+    fun loginDataChanged(address: String, password: String) {
+        if (!isAddressValid(address)) {
+            _loginForm.value = LoginFormState(addressError = R.string.invalid_address)
         } else if (!isPasswordValid(password)) {
             _loginForm.value = LoginFormState(passwordError = R.string.invalid_password)
         } else {
@@ -66,16 +70,20 @@ class LoginViewModel(private val loginRepository: LoginRepository) : ViewModel()
     }
 
     // A placeholder username validation check
-    private fun isUserNameValid(username: String): Boolean {
-        return if (username.contains('@')) {
-            Patterns.EMAIL_ADDRESS.matcher(username).matches()
+    private fun isAddressValid(address: String): Boolean {
+        return if (address.contains('@')) {
+            Patterns.EMAIL_ADDRESS.matcher(address).matches()
         } else {
-            username.isNotBlank()
+            address.isNotBlank()
         }
     }
 
     // A placeholder password validation check
     private fun isPasswordValid(password: String): Boolean {
         return password.length > 5
+    }
+
+    private fun isUsernameValid(username: String): Boolean {
+        return username.length > 4
     }
 }
